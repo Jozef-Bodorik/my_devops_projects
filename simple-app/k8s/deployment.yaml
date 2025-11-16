@@ -16,7 +16,7 @@ spec:
     spec:
       containers:
         - name: simple-app
-          image: jbodorik/simple-app:0.1
+          image: jbodorik/simple-app:0.6
           ports:
             - containerPort: 8080
 ---
@@ -29,6 +29,6 @@ spec:
     app: simple-app
   type: NodePort
   ports:
-    - port: 80
+    - port: 8080
       targetPort: 8080
-      protocol: TCP
+      nodePort: 30080
