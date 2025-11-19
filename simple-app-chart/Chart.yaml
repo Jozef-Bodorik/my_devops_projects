@@ -1,0 +1,4 @@
+apiVersion: v2
+name: my-simple-app
+description: A simple example app chart
+version: 0.1.0
