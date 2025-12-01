@@ -1,0 +1,8 @@
+# docker-compose.yml
+version: "3.9"
+
+services:
+  simple-app:
+    image: jbodorik/simple-app:0.6
+    ports:
+      - "8080:8080"
