@@ -1,0 +1,41 @@
+services:
+  postgres:
+    image: postgres:15
+    environment:
+      POSTGRES_DB: netbox
+      POSTGRES_USER: netbox
+      POSTGRES_PASSWORD: netbox
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    restart: unless-stopped
+
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+
+  netbox:
+    image: netboxcommunity/netbox:latest
+    depends_on:
+      - postgres
+      - redis
+    environment:
+      ALLOWED_HOSTS: "*"
+      DB_NAME: netbox
+      DB_USER: netbox
+      DB_PASSWORD: netbox
+      DB_HOST: postgres
+      DB_PORT: "5432"
+
+      REDIS_HOST: redis
+
+      # Optional superuser for first login (auto-created on first startup)
+      SUPERUSER_EMAIL: admin@example.com
+      SUPERUSER_PASSWORD: admin
+      SECRET_KEY: thisIsADevKey123456789thisIsADevKey123456789
+
+    ports:
+      - "8000:8080"
+    restart: unless-stopped
+
+volumes:
+  pgdata:
