@@ -1,2 +1,15 @@
-.DS_Store
 .env
+# Terraform
+**/.terraform/*
+**/.terraform.lock.hcl
+**/*.tfstate
+**/*.tfstate.*
+crash.log
+*.tfplan
+
+# Kubernetes local files
+*.kubeconfig
+
+# OS/editor
+.DS_Store
+.vscode/

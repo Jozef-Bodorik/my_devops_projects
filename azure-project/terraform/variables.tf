@@ -1,5 +1,5 @@
 variable "rg_name" {
-  default = "kml_rg_main-b2709b082f134123"
+  default = "kml_rg_main-33832714a9814b78"
   type    = string
 }
 
