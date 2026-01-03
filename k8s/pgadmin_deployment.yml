@@ -14,7 +14,7 @@ spec:
     spec:
       containers:
         - name: pgadmin
-          image: pgadminacr68790.azurecr.io/pgadmin:v1
+          image: pgadminacr38469.azurecr.io/pgadmin:v1
           env:
             - name: PGADMIN_DEFAULT_EMAIL
               value: admin@domain.com
