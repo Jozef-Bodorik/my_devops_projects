@@ -9,7 +9,7 @@ permissions:
   contents: read
 
 env:
-  ACR_LOGIN_SERVER: ${{ secrets.ACR_NAME }}.azurecr.io
+  ACR_LOGIN_SERVER: ${{ secrets.ACR_LOGIN_SERVER }}.azurecr.io
   IMAGE_NAME: pgadmin
   IMAGE_TAG: ${{ github.sha }}
 
