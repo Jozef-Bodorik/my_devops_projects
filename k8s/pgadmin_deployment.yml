@@ -2,6 +2,8 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: pgadmin
+  labels:
+    app: pgadmin
 spec:
   replicas: 1
   selector:
@@ -12,25 +14,38 @@ spec:
       labels:
         app: pgadmin
     spec:
+      imagePullSecrets:
+        - name: acr-pull
       containers:
         - name: pgadmin
-          image: pgadminacr38469.azurecr.io/pgadmin:v1
-          env:
-            - name: PGADMIN_DEFAULT_EMAIL
-              value: admin@domain.com
-            - name: PGADMIN_DEFAULT_PASSWORD
-              value: admin
+          image: pgadminacr56872.azurecr.io/pgadmin:1.0
+          imagePullPolicy: IfNotPresent
           ports:
             - containerPort: 80
+          env:
+            - name: PGADMIN_DEFAULT_EMAIL
+              value: "admin@example.com"
+            - name: PGADMIN_DEFAULT_PASSWORD
+              value: "Admin123!"
+          # pgAdmin stores data in /var/lib/pgadmin. Optional but recommended.
+          volumeMounts:
+            - name: pgadmin-data
+              mountPath: /var/lib/pgadmin
+      volumes:
+        - name: pgadmin-data
+          emptyDir: {}
 ---
 apiVersion: v1
 kind: Service
 metadata:
   name: pgadmin
+  labels:
+    app: pgadmin
 spec:
-  type: LoadBalancer
   selector:
     app: pgadmin
   ports:
-    - port: 80
+    - name: http
+      port: 80
       targetPort: 80
+  type: LoadBalancer

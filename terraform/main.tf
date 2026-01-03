@@ -27,3 +27,4 @@ module "aks" {
   prefix    = var.prefix
   subnet_id = module.network.subnet_id
 }
+
