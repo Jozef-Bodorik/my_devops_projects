@@ -1,60 +1,75 @@
-name: Build and Deploy pgAdmin to AKS
+name: build-and-deploy
 
 on:
   push:
     branches: [ "master" ]
-
-env:
-  IMAGE_NAME: pgadmin
+    paths:
+      - "azure-project/**"
+      - ".github/workflows/build-and-deploy.yml"
+  workflow_dispatch:
 
 jobs:
-  build-and-deploy:
+  build_push_deploy:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout repository
+      - name: Checkout
         uses: actions/checkout@v4
 
-      # 1️⃣ Login to Azure
+      # Azure login using Service Principal (your KodeKloud creds)
       - name: Azure Login
         uses: azure/login@v2
         with:
-          creds: ${{ secrets.AZURE_CREDENTIALS }}
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+          client-secret: ${{ secrets.AZURE_CLIENT_SECRET }}
 
-      # 2️⃣ Login to ACR
-      - name: Login to ACR
+      # Debug prints (so we instantly see if variables are empty)
+      - name: Debug variables
         run: |
-          az acr login --name "${{ secrets.ACR_NAME }}"
+          echo "ACR_NAME=${{ secrets.ACR_NAME }}"
+          echo "AKS_CLUSTER_NAME=${{ secrets.AKS_CLUSTER_NAME }}"
+          echo "AKS_RESOURCE_GROUP=${{ secrets.AKS_RESOURCE_GROUP }}"
 
-      # 3️⃣ Build & Push pgAdmin image
-      - name: Build and Push Image
-        run: |
-          TAG="${GITHUB_SHA}"
-          ACR_LOGIN_SERVER="$(az acr show -n "${{ secrets.ACR_NAME }}" --query loginServer -o tsv)"
+      # Docker login to ACR (no az acr login)
+      - name: Docker login to ACR
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ secrets.ACR_NAME }}.azurecr.io
+          username: ${{ secrets.AZURE_CLIENT_ID }}
+          password: ${{ secrets.AZURE_CLIENT_SECRET }}
 
-          # CHANGE THIS if your Dockerfile is not in repo root
-          DOCKER_CONTEXT="."
+      # Build & push pgAdmin image (adjust Dockerfile path)
+      - name: Build and push pgadmin image
+        uses: docker/build-push-action@v6
+        with:
+          context: azure-project/pgadmin
+          push: true
+          tags: |
+            ${{ secrets.ACR_NAME }}.azurecr.io/pgadmin:latest
+            ${{ secrets.ACR_NAME }}.azurecr.io/pgadmin:${{ github.sha }}
 
-          docker build -t "$ACR_LOGIN_SERVER/${{ env.IMAGE_NAME }}:$TAG" "$DOCKER_CONTEXT"
-          docker push "$ACR_LOGIN_SERVER/${{ env.IMAGE_NAME }}:$TAG"
+      # Build & push postgres image ONLY if you have your own Dockerfile.
+      # If you're using official postgres image, SKIP this whole step.
+      # - name: Build and push postgres image
+      #   uses: docker/build-push-action@v6
+      #   with:
+      #     context: azure-project/postgres
+      #     push: true
+      #     tags: |
+      #       ${{ secrets.ACR_NAME }}.azurecr.io/postgres:latest
+      #       ${{ secrets.ACR_NAME }}.azurecr.io/postgres:${{ github.sha }}
 
-      # 4️⃣ Set AKS context (kubectl login)
+      # Get AKS kubeconfig for kubectl
       - name: Set AKS context
         uses: azure/aks-set-context@v4
         with:
-          resource-group: ${{ secrets.AKS_RG }}
-          cluster-name: ${{ secrets.AKS_NAME }}
+          resource-group: ${{ secrets.AKS_RESOURCE_GROUP }}
+          cluster-name: ${{ secrets.AKS_CLUSTER_NAME }}
 
-      # 5️⃣ Deploy to AKS (default namespace)
+      # Deploy manifests (make sure your manifests reference the ACR image!)
       - name: Deploy to AKS
         run: |
-          TAG="${GITHUB_SHA}"
-          ACR_LOGIN_SERVER="$(az acr show -n "${{ secrets.ACR_NAME }}" --query loginServer -o tsv)"
-
-          sed "s|pgadminacr68790.azurecr.io/pgadmin:PLACEHOLDER|$ACR_LOGIN_SERVER/pgadmin:$TAG|g" k8s/pgadmin.yaml | kubectl apply -f -
-
-          kubectl apply -f k8s/postgres.yaml
-
-          kubectl rollout status deploy/pgadmin
-          kubectl get pods
-          kubectl get svc
+          kubectl apply -f azure-project/k8s/
+          kubectl rollout status deploy/pgadmin --timeout=120s
