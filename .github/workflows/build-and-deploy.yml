@@ -1,0 +1,98 @@
+name: build-and-deploy
+
+on:
+  push:
+    branches: [ "master", "main" ]
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+
+env:
+  ACR_LOGIN_SERVER: ${{ secrets.ACR_NAME }}.azurecr.io
+  IMAGE_NAME: pgadmin
+  IMAGE_TAG: ${{ github.sha }}
+
+jobs:
+  build_push_deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      # Fail early if expected folders/files are missing
+      - name: Validate repo structure
+        run: |
+          echo "Repo root:"
+          ls -la
+          test -d k8s || (echo "ERROR: k8s/ folder not found" && exit 1)
+
+          # Accept either Dockerfile or dockerfile in repo root
+          if [ -f Dockerfile ]; then
+            echo "Found Dockerfile"
+          elif [ -f dockerfile ]; then
+            echo "Found dockerfile"
+          else
+            echo "ERROR: Neither Dockerfile nor dockerfile exists in repo root"
+            exit 1
+          fi
+
+      - name: Azure Login
+        uses: azure/login@v2
+        with:
+          creds: |
+            {
+              "clientId": "${{ secrets.AZURE_CLIENT_ID }}",
+              "clientSecret": "${{ secrets.AZURE_CLIENT_SECRET }}",
+              "subscriptionId": "${{ secrets.AZURE_SUBSCRIPTION_ID }}",
+              "tenantId": "${{ secrets.AZURE_TENANT_ID }}"
+            }
+
+      # Docker login to ACR using Service Principal creds (simple demo approach)
+      - name: Docker login to ACR
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.ACR_LOGIN_SERVER }}
+          username: ${{ secrets.AZURE_CLIENT_ID }}
+          password: ${{ secrets.AZURE_CLIENT_SECRET }}
+
+      - name: Build and push image to ACR
+        run: |
+          set -e
+
+          # Build context is repo root "."
+          # Use Dockerfile if present, otherwise use lowercase dockerfile
+          if [ -f Dockerfile ]; then
+            DOCKERFILE_ARG="-f Dockerfile"
+          else
+            DOCKERFILE_ARG="-f dockerfile"
+          fi
+
+          echo "Building image using: $DOCKERFILE_ARG"
+          docker build $DOCKERFILE_ARG -t "${ACR_LOGIN_SERVER}/${IMAGE_NAME}:${IMAGE_TAG}" .
+          docker tag "${ACR_LOGIN_SERVER}/${IMAGE_NAME}:${IMAGE_TAG}" "${ACR_LOGIN_SERVER}/${IMAGE_NAME}:latest"
+
+          docker push "${ACR_LOGIN_SERVER}/${IMAGE_NAME}:${IMAGE_TAG}"
+          docker push "${ACR_LOGIN_SERVER}/${IMAGE_NAME}:latest"
+
+      - name: Set AKS context
+        uses: azure/aks-set-context@v4
+        with:
+          resource-group: ${{ secrets.AKS_RESOURCE_GROUP }}
+          cluster-name: ${{ secrets.AKS_CLUSTER_NAME }}
+
+      - name: Deploy manifests
+        run: |
+          set -e
+          kubectl apply -f k8s/
+
+          # If your deployment is named pgadmin, this works.
+          # If it's different, change "pgadmin" to the right name.
+          kubectl rollout status deploy/pgadmin --timeout=180s || true
+
+          echo "Pods:"
+          kubectl get pods -o wide
+
+          echo "Services:"
+          kubectl get svc -o wide
