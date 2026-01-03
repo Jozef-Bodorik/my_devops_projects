@@ -1,9 +1,9 @@
-terraform {
-  cloud {
-    organization = "jozef_bodorik_org"
+# terraform {
+#   cloud {
+#     organization = "jozef_bodorik_org"
 
-    workspaces {
-      name = "azure-aks"
-    }
-  }
-}
+#     workspaces {
+#       name = "azure-aks"
+#     }
+#   }
+# }

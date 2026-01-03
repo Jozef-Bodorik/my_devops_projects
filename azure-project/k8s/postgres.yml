@@ -17,16 +17,22 @@ spec:
           image: postgres:15
           env:
             - name: POSTGRES_USER
-              value: "admin"
+              value: admin
             - name: POSTGRES_PASSWORD
-              value: "admin"
+              value: admin
             - name: POSTGRES_DB
-              value: "postgres"
+              value: postgres
           ports:
             - containerPort: 5432
-          volumeMounts:
-            - name: data
-              mountPath: /var/lib/postgresql/data
-      volumes:
-        - name: data
-          emptyDir: {}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: postgres
+spec:
+  type: ClusterIP
+  selector:
+    app: postgres
+  ports:
+    - port: 5432
+      targetPort: 5432
